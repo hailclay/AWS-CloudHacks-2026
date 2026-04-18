@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TrailMatch — Find Your Hike</title>
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -198,6 +199,8 @@
       align-items: center;
       justify-content: center;
       font-size: 40px;
+      background-size: cover;
+      background-position: center;
     }
 
     .hike-card-body { padding: 1rem; }
@@ -213,6 +216,43 @@
       background: var(--earth-light);
       color: var(--earth);
       border: 0.5px solid #e0d4a8;
+    }
+
+    .map-wrap { max-width: 980px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+    .map-grid { display: grid; grid-template-columns: 340px 1fr; gap: 1rem; align-items: start; }
+    .map-panel {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      max-height: 70vh;
+      overflow: auto;
+    }
+    .map-panel h3 { font-family: 'Lora', serif; font-size: 18px; color: var(--green); margin-bottom: 0.75rem; }
+    .map-item {
+      padding: 0.75rem 0.85rem;
+      border-radius: 10px;
+      border: 0.5px solid var(--border);
+      cursor: pointer;
+      margin-bottom: 10px;
+      transition: all 0.15s;
+      background: var(--white);
+    }
+    .map-item:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.07); }
+    .map-item .name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .map-item .meta { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+    #map {
+      height: 70vh;
+      width: 100%;
+      border-radius: 12px;
+      border: 0.5px solid var(--border);
+      overflow: hidden;
+      background: var(--stone-light);
+    }
+    #map-status {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
     }
 
     .skip-link {
@@ -444,6 +484,8 @@
       nav { padding: 1rem; }
       .nav-links { gap: 0.25rem; }
       .nav-btn { padding: 7px 12px; }
+      .map-grid { grid-template-columns: 1fr; }
+      #map { height: 56vh; }
     }
   </style>
 </head>
@@ -451,9 +493,10 @@
   <nav>
     <div class="nav-logo">TrailMatch</div>
     <div class="nav-links">
-      <button class="nav-btn active" onclick="showPage('quiz')">Quiz</button>
-      <button class="nav-btn" onclick="showPage('results')" id="nav-results" style="display:none">My Hikes</button>
-      <button class="nav-btn" onclick="showPage('social')">Community</button>
+      <button class="nav-btn active" data-page="quiz" onclick="showPage('quiz')">Quiz</button>
+      <button class="nav-btn" data-page="results" onclick="showPage('results')" id="nav-results" style="display:none">My Hikes</button>
+      <button class="nav-btn" data-page="map" onclick="showPage('map')" id="nav-map" style="display:none">Map</button>
+      <button class="nav-btn" data-page="social" onclick="showPage('social')">Community</button>
     </div>
   </nav>
 
@@ -551,6 +594,9 @@
       <div class="section-header">
         <h2>Your matched hikes</h2>
         <p>Based on your personality — click any hike to explore more</p>
+        <div style="margin-top:0.85rem;">
+          <button class="btn-outline" id="open-map-btn" style="display:none" onclick="openMap()">View on map →</button>
+        </div>
       </div>
       <div id="hike-loading" style="display:none">
   <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
@@ -568,6 +614,24 @@
 
 <div class="hike-grid" id="hike-grid"></div>
       <a class="skip-link" onclick="showPage('social')">Skip to community →</a>
+    </div>
+  </div>
+
+  <div class="page" id="page-map">
+    <div class="map-wrap">
+      <div class="section-header" style="margin-bottom:1rem;">
+        <h2>Trail map</h2>
+        <p id="map-subtitle">Explore your recommendations</p>
+      </div>
+
+      <div class="map-grid">
+        <div class="map-panel">
+          <h3>Recommendations</h3>
+          <div id="map-list"></div>
+          <div id="map-status"></div>
+        </div>
+        <div id="map"></div>
+      </div>
     </div>
   </div>
 
@@ -608,6 +672,7 @@
         <div class="detail-actions">
           <button class="action-btn" onclick="openPostModal(currentHike.id, currentHike.name)">📸 Post a photo</button>
           <button class="action-btn" onclick="openMeetupModal(currentHike.id, currentHike.name)">📅 Plan a meetup</button>
+          <button class="action-btn" id="detail-map-btn" style="display:none" onclick="viewCurrentHikeOnMap()">🗺 View on map</button>
         </div>
       </div>
 
@@ -701,6 +766,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
