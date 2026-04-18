@@ -524,6 +524,23 @@
           </div>
         </div>
 
+<div class="question-block">
+  <div class="q-label">Location</div>
+  <div class="q-text">Where do you want to hike?</div>
+  <input type="text" id="hike-location" placeholder="Irvine, CA" style="width:100%; padding:12px; border:0.5px solid var(--border); border-radius:10px; font-size:14px;" />
+</div>
+
+<div class="question-block">
+  <div class="q-label">Search radius</div>
+  <div class="q-text">How far are you willing to go?</div>
+  <select id="hike-radius" style="width:100%; padding:12px; border:0.5px solid var(--border); border-radius:10px; font-size:14px;">
+    <option value="5">Within 5 miles</option>
+    <option value="10" selected>Within 10 miles</option>
+    <option value="25">Within 25 miles</option>
+    <option value="50">Within 50 miles</option>
+  </select>
+</div>
+
         <button class="btn-primary" id="submit-btn" disabled onclick="submitQuiz()">Find my perfect hike →</button>
       </div>
     </div>
@@ -536,10 +553,20 @@
         <p>Based on your personality — click any hike to explore more</p>
       </div>
       <div id="hike-loading" style="display:none">
-        <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-        <p style="font-size:13px;color:var(--text-muted)">Finding your trails...</p>
-      </div>
-      <div class="hike-grid" id="hike-grid"></div>
+  <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+  <p style="font-size:13px;color:var(--text-muted)">Finding your trails...</p>
+</div>
+
+<div id="quiz-analysis" style="display:none; margin-bottom:1.5rem;">
+  <div style="background:var(--green-light); border:0.5px solid #c8dbb0; border-radius:14px; padding:1.25rem 1.25rem 1rem 1.25rem;">
+    <div style="font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-muted); margin-bottom:0.5rem;">
+      Your trail personality
+    </div>
+    <div id="quiz-analysis-text" style="font-size:14px; line-height:1.7; color:var(--stone);"></div>
+  </div>
+</div>
+
+<div class="hike-grid" id="hike-grid"></div>
       <a class="skip-link" onclick="showPage('social')">Skip to community →</a>
     </div>
   </div>
