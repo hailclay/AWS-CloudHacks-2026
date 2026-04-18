@@ -1,0 +1,396 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: TrailMatch backend — Lambda + API Gateway + DynamoDB
+
+# ---------------------------------------------------------------------------
+# Global settings applied to every Lambda function in this file.
+# Runtime, timeout, and environment variables are set once here so we don't
+# repeat them on every function definition below.
+# ---------------------------------------------------------------------------
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 15
+    MemorySize: 256
+    Environment:
+      Variables:
+        # Table names are injected at deploy time from the Resources section.
+        # Lambda reads these via process.env.PREFERENCES_TABLE, etc.
+        PREFERENCES_TABLE: !Ref PreferencesTable
+        TRAILS_TABLE: !Ref TrailsTable
+        RATINGS_TABLE: !Ref RatingsTable
+        EVENTS_TABLE: !Ref EventsTable
+        POSTS_TABLE: !Ref PostsTable
+        # The S3 bucket where trail JSON data and post photos live.
+        TRAILS_BUCKET: !Ref TrailsBucket
+        # Auth0 domain used to verify JWT tokens on every request.
+        # Set this in samconfig.toml or pass as --parameter-overrides at deploy time.
+        AUTH0_DOMAIN: !Ref Auth0Domain
+        AUTH0_AUDIENCE: !Ref Auth0Audience
+
+# ---------------------------------------------------------------------------
+# Parameters let you pass in values at deploy time without hardcoding secrets.
+# Run: sam deploy --parameter-overrides Auth0Domain=yourapp.auth0.com ...
+# ---------------------------------------------------------------------------
+Parameters:
+  Auth0Domain:
+    Type: String
+    Description: Your Auth0 domain, e.g. dev-abc123.us.auth0.com
+  Auth0Audience:
+    Type: String
+    Description: Your Auth0 API audience identifier
+
+# ---------------------------------------------------------------------------
+# Resources — everything AWS will create when you run `sam deploy`
+# ---------------------------------------------------------------------------
+Resources:
+
+  # -------------------------------------------------------------------------
+  # API GATEWAY
+  # HttpApi is the newer, cheaper, faster version of API Gateway.
+  # It automatically handles CORS so your React app (on localhost:5173 or
+  # your deployed domain) can call it without browser errors.
+  # -------------------------------------------------------------------------
+  TrailMatchApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "http://localhost:5173"   # Vite dev server
+          - "http://localhost:3000"   # Alternative local port
+        AllowHeaders:
+          - Content-Type
+          - Authorization             # Needed to pass the Auth0 JWT token
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+
+  # -------------------------------------------------------------------------
+  # LAMBDA FUNCTIONS
+  # Each function handles one logical group of endpoints.
+  # We split them by domain (preferences, trails, ratings, events, posts)
+  # so each function stays small and deploys independently.
+  # The Events block is what connects a function to API Gateway — it says
+  # "when this HTTP method + path is hit, run this function."
+  # -------------------------------------------------------------------------
+
+  # --- Preferences ---------------------------------------------------------
+  # Handles GET /preferences and POST /preferences
+  # Reads/writes the user's hiking preference profile in DynamoDB.
+  PreferencesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/preferences/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PreferencesTable
+      Events:
+        GetPreferences:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /preferences
+            Method: GET
+        SavePreferences:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /preferences
+            Method: POST
+
+  # --- Trails --------------------------------------------------------------
+  # Handles GET /trails (list with preference filtering) and GET /trails/{id}
+  # Reads trail data from S3 (the seed JSON file) and DynamoDB.
+  TrailsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/trails/
+      Handler: index.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TrailsTable
+        - S3ReadPolicy:
+            BucketName: !Ref TrailsBucket
+      Events:
+        ListTrails:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /trails
+            Method: GET
+        GetTrail:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /trails/{id}
+            Method: GET
+
+  # --- Ratings -------------------------------------------------------------
+  # Handles POST /ratings, GET /ratings/{trailId}, DELETE /ratings/{trailId}
+  # One rating per user per trail — Lambda enforces this with a conditional write.
+  RatingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/ratings/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RatingsTable
+      Events:
+        SubmitRating:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /ratings
+            Method: POST
+        GetTrailRatings:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /ratings/{trailId}
+            Method: GET
+        DeleteRating:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /ratings/{trailId}
+            Method: DELETE
+
+  # --- Events --------------------------------------------------------------
+  # Handles CRUD for hike meetup events.
+  EventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/events/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+      Events:
+        CreateEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /events
+            Method: POST
+        ListEvents:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /events
+            Method: GET
+        GetEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /events/{id}
+            Method: GET
+        JoinEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /events/{id}/join
+            Method: POST
+        CancelEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /events/{id}
+            Method: DELETE
+
+  # --- Posts ---------------------------------------------------------------
+  # Handles social feed posts with optional S3 photo uploads.
+  PostsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/posts/
+      Handler: index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PostsTable
+        - S3CrudPolicy:
+            BucketName: !Ref TrailsBucket
+      Events:
+        CreatePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /posts
+            Method: POST
+        GetFeed:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /feed
+            Method: GET
+        GetTrailPosts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /posts/trail/{trailId}
+            Method: GET
+        DeletePost:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /posts/{id}
+            Method: DELETE
+
+  # -------------------------------------------------------------------------
+  # DYNAMODB TABLES
+  # DynamoDB is a key-value / document database. Every table needs a primary
+  # key. We use a composite key (PK + SK) pattern — this is called
+  # "single-table design lite" and lets one table handle multiple access
+  # patterns efficiently.
+  #
+  # BillingMode: PAY_PER_REQUEST means you pay per read/write, not per hour.
+  # Perfect for a hackathon — zero cost when idle.
+  # -------------------------------------------------------------------------
+
+  # Stores each user's hiking preference profile.
+  # PK = userId (Auth0 user.sub), no SK needed — one record per user.
+  PreferencesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TrailMatch-Preferences
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+
+  # Stores trail metadata (name, terrain, difficulty, coords, etc.)
+  # PK = trailId. Seeded from S3 JSON on first deploy.
+  TrailsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TrailMatch-Trails
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: trailId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: trailId
+          KeyType: HASH
+
+  # Stores user trail ratings (S/A/B/C/D tiers).
+  # PK = userId, SK = trailId — composite key enforces one rating per user per trail.
+  RatingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TrailMatch-Ratings
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: trailId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: trailId
+          KeyType: RANGE
+      # GSI lets us query "all ratings for a given trail" efficiently.
+      # Without this, we'd have to scan the whole table — slow and expensive.
+      GlobalSecondaryIndexes:
+        - IndexName: TrailRatingsIndex
+          KeySchema:
+            - AttributeName: trailId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # Stores hike meetup events.
+  # PK = eventId. GSI on trailId for "events for this trail" queries.
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TrailMatch-Events
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+        - AttributeName: trailId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: TrailEventsIndex
+          KeySchema:
+            - AttributeName: trailId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # Stores social posts (photos, captions, wildlife tags).
+  # PK = postId. GSI on trailId for trail-specific post feeds.
+  PostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TrailMatch-Posts
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: postId
+          AttributeType: S
+        - AttributeName: trailId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: postId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: TrailPostsIndex
+          KeySchema:
+            - AttributeName: trailId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # -------------------------------------------------------------------------
+  # S3 BUCKET
+  # One bucket for everything: trail seed data JSON, trail images, post photos.
+  # Versioning is off (not needed for a hackathon).
+  # Public access is blocked — Lambda accesses it with IAM, not public URLs.
+  # For post photos, Lambda will generate pre-signed URLs so the browser can
+  # upload directly to S3 without going through Lambda (faster, cheaper).
+  # -------------------------------------------------------------------------
+  TrailsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub trailmatch-assets-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - "http://localhost:5173"
+              - "http://localhost:3000"
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedHeaders:
+              - "*"
+            MaxAge: 3000
+
+# ---------------------------------------------------------------------------
+# Outputs — printed after `sam deploy` so you can copy the API URL into
+# your React app's .env file without digging through the AWS console.
+# ---------------------------------------------------------------------------
+Outputs:
+  ApiUrl:
+    Description: "API Gateway base URL — paste this into your frontend .env as VITE_API_URL"
+    Value: !Sub "https://${TrailMatchApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  TrailsBucketName:
+    Description: "S3 bucket name for trail data and post photos"
+    Value: !Ref TrailsBucket
