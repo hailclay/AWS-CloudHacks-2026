@@ -1,0 +1,5 @@
+streamlit
+geopy
+streamlit-searchbox
+folium
+streamlit-folium
