@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrailMatch — Find Your Hike</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #2d5016;
+      --green-mid: #4a7c2f;
+      --green-light: #e8f0e0;
+      --earth: #8b6914;
+      --earth-light: #f5eed8;
+      --stone: #5a5550;
+      --stone-light: #f0ece6;
+      --white: #fdfcf9;
+      --text: #1e1c18;
+      --text-muted: #7a756e;
+      --border: #ddd8d0;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--white);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 0.5px solid var(--border);
+      background: var(--white);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo {
+      font-family: 'Lora', serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--green);
+      letter-spacing: -0.02em;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .nav-btn {
+      padding: 7px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      border: 0.5px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+
+    .nav-btn:hover { background: var(--stone-light); color: var(--text); }
+    .nav-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .quiz-wrap {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+
+    .quiz-header { text-align: center; margin-bottom: 2.5rem; }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1.hero {
+      font-family: 'Lora', serif;
+      font-size: 32px;
+      font-weight: 600;
+      color: var(--green);
+      line-height: 1.3;
+    }
+
+    .quiz-header p { font-size: 14px; color: var(--text-muted); margin-top: 0.5rem; }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-bottom: 2.5rem;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .question-block { margin-bottom: 2rem; }
+
+    .q-label {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .q-text {
+      font-family: 'Lora', serif;
+      font-size: 19px;
+      color: var(--text);
+      margin-bottom: 1rem;
+      line-height: 1.4;
+    }
+
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .options-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    .opt-btn {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px 14px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text-muted);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .opt-btn:hover { border-color: var(--green-mid); color: var(--text); background: var(--green-light); }
+    .opt-btn.selected { border: 1.5px solid var(--green); color: var(--green); background: var(--green-light); font-weight: 500; }
+    .opt-btn .opt-label { display: block; font-weight: 500; font-size: 13px; }
+    .opt-btn .opt-sub { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .btn-primary {
+      width: 100%;
+      margin-top: 1.5rem;
+      padding: 14px;
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .results-wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    .section-header { margin-bottom: 1.5rem; }
+    .section-header h2 { font-family: 'Lora', serif; font-size: 24px; color: var(--green); }
+    .section-header p { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    .hike-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; margin-bottom: 2.5rem; }
+
+    .hike-card {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .hike-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+
+    .hike-card-img {
+      height: 140px;
+      background: var(--green-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+    }
+
+    .hike-card-body { padding: 1rem; }
+    .hike-card-body h3 { font-family: 'Lora', serif; font-size: 15px; color: var(--text); margin-bottom: 4px; }
+    .hike-card-body p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+    .tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .tag {
+      font-size: 10px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: var(--earth-light);
+      color: var(--earth);
+      border: 0.5px solid #e0d4a8;
+    }
+
+    .skip-link {
+      display: block;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.5rem;
+      text-decoration: underline;
+    }
+
+    .skip-link:hover { color: var(--text); }
+
+    .loading-dots { display: flex; gap: 6px; align-items: center; margin: 2rem 0; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green-mid); animation: pulse 1.2s ease-in-out infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes pulse { 0%,80%,100% { opacity:0.3; transform:scale(0.85); } 40% { opacity:1; transform:scale(1); } }
+
+    .social-wrap { max-width: 860px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    .social-grid { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; }
+
+    .feed-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+    .feed-header h2 { font-family: 'Lora', serif; font-size: 20px; color: var(--green); }
+
+    .btn-outline {
+      padding: 7px 16px;
+      background: transparent;
+      border: 0.5px solid var(--green);
+      border-radius: 20px;
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--green);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+
+    .btn-outline:hover { background: var(--green); color: #fff; }
+
+    .post-card {
+      background: var(--white);
+      border: 0.5px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 12px;
+      animation: fadeUp 0.3s ease forwards;
+    }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+    .post-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--green-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 500; color: var(--green);
+    }
+    .post-meta-text .author { font-size: 13px; font-weight: 500; color: var(--text); }
+    .post-meta-text .hike-ref { font-size: 11px; color: var(--text-muted); }
+    .post-caption { font-size: 14px; color: var(--text); line-height: 1.6; margin-bottom: 8px; }
+    .post-photo { width: 100%; border-radius: 8px; max-height: 260px; object-fit: cover; margin-bottom: 8px; }
+    .post-time { font-size: 11px; color: var(--text-muted); }
+
+    .meetups-panel h3 { font-family: 'Lora', serif; font-size: 18px; color: var(--green); margin-bottom: 1rem; }
+
+    .meetup-card {
+      background: var(--earth-light);
+      border: 0.5px solid #e0d4a8;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .meetup-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.07);
+    }
+
+    .meetup-card h4 { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+    .meetup-card .meetup-meta { font-size: 12px; color: var(--earth); margin-bottom: 3px; }
+    .meetup-card .meetup-notes { font-size: 12px; color: var(--text-muted); }
+
+    .detail-wrap { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem; }
+
+    .back-btn {
+      background: none;
+      border: none;
+      font-size: 13px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .back-btn:hover { color: var(--text); }
+
+    .detail-hero {
+      background: var(--green-light);
+      border-radius: 14px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      border: 0.5px solid #c8dbb0;
+    }
+
+    .detail-hero h1 { font-family: 'Lora', serif; font-size: 26px; color: var(--green); margin-bottom: 0.5rem; }
+    .detail-hero p { font-size: 14px; color: var(--stone); line-height: 1.7; }
+
+    .detail-actions { display: flex; gap: 10px; margin-top: 1.25rem; flex-wrap: wrap; }
+
+    .action-btn {
+      padding: 9px 18px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      cursor: pointer;
+      border: 0.5px solid var(--border);
+      background: var(--white);
+      color: var(--text);
+      transition: all 0.15s;
+    }
+
+    .action-btn:hover { background: var(--green); color: #fff; border-color: var(--green); }
+
+    .detail-tabs { display: flex; gap: 0; border-bottom: 0.5px solid var(--border); margin-bottom: 1.5rem; }
+    .detail-tab {
+      padding: 10px 20px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+    .detail-tab.active { color: var(--green); border-bottom-color: var(--green); font-weight: 500; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--white);
+      border-radius: 14px;
+      padding: 1.75rem;
+      width: 100%;
+      max-width: 440px;
+      margin: 1rem;
+    }
+
+    .modal h3 { font-family: 'Lora', serif; font-size: 19px; color: var(--green); margin-bottom: 1.25rem; }
+
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; letter-spacing: 0.05em; text-transform: uppercase; }
+    .form-group input, .form-group textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 0.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+      background: var(--white);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--green); }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+
+    .modal-actions { display: flex; gap: 8px; margin-top: 1.25rem; }
+    .modal-cancel {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: 0.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .modal-submit {
+      flex: 2;
+      padding: 10px;
+      background: var(--green);
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .empty-state .empty-icon { font-size: 32px; margin-bottom: 0.75rem; }
+
+    @media (max-width: 800px) {
+      .social-grid { grid-template-columns: 1fr; }
+      nav { padding: 1rem; }
+      .nav-links { gap: 0.25rem; }
+      .nav-btn { padding: 7px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="nav-logo">TrailMatch</div>
+    <div class="nav-links">
+      <button class="nav-btn active" onclick="showPage('quiz')">Quiz</button>
+      <button class="nav-btn" onclick="showPage('results')" id="nav-results" style="display:none">My Hikes</button>
+      <button class="nav-btn" onclick="showPage('social')">Community</button>
+    </div>
+  </nav>
+
+  <div class="page active" id="page-quiz">
+    <div class="quiz-wrap">
+      <div class="quiz-header">
+        <div class="eyebrow">Trail Finder</div>
+        <h1 class="hero">Which hike is meant for you?</h1>
+        <p>Five questions. One perfect trail.</p>
+      </div>
+
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress" style="width:0%"></div>
+      </div>
+
+      <div id="quiz-form">
+        <div class="question-block">
+          <div class="q-label">Question 1 of 5</div>
+          <div class="q-text">Where do you feel most at peace?</div>
+          <div class="options-grid">
+            <button class="opt-btn" data-q="1" data-v="forest" onclick="pick(this)"><span class="opt-label">Deep in a forest</span><span class="opt-sub">Towering trees, filtered light</span></button>
+            <button class="opt-btn" data-q="1" data-v="mountain" onclick="pick(this)"><span class="opt-label">On a mountain peak</span><span class="opt-sub">Big skies, open horizons</span></button>
+            <button class="opt-btn" data-q="1" data-v="beach" onclick="pick(this)"><span class="opt-label">By the ocean</span><span class="opt-sub">Salt air, crashing waves</span></button>
+            <button class="opt-btn" data-q="1" data-v="desert" onclick="pick(this)"><span class="opt-label">In a desert canyon</span><span class="opt-sub">Red rock, silence, solitude</span></button>
+          </div>
+        </div>
+
+        <div class="question-block">
+          <div class="q-label">Question 2 of 5</div>
+          <div class="q-text">What's your fitness comfort zone?</div>
+          <div class="options-grid">
+            <button class="opt-btn" data-q="2" data-v="beginner" onclick="pick(this)"><span class="opt-label">Easy stroller</span><span class="opt-sub">Flat paths, short distances</span></button>
+            <button class="opt-btn" data-q="2" data-v="moderate" onclick="pick(this)"><span class="opt-label">Casual hiker</span><span class="opt-sub">Some hills, a few miles</span></button>
+            <button class="opt-btn" data-q="2" data-v="advanced" onclick="pick(this)"><span class="opt-label">Experienced trekker</span><span class="opt-sub">Elevation gain, long days</span></button>
+            <button class="opt-btn" data-q="2" data-v="expert" onclick="pick(this)"><span class="opt-label">Summit chaser</span><span class="opt-sub">Technical terrain, multi-day</span></button>
+          </div>
+        </div>
+
+        <div class="question-block">
+          <div class="q-label">Question 3 of 5</div>
+          <div class="q-text">What do you most want to see?</div>
+          <div class="options-grid">
+            <button class="opt-btn" data-q="3" data-v="wildlife" onclick="pick(this)"><span class="opt-label">Wildlife and birds</span><span class="opt-sub">Deer, hawks, maybe a fox</span></button>
+            <button class="opt-btn" data-q="3" data-v="views" onclick="pick(this)"><span class="opt-label">Panoramic views</span><span class="opt-sub">Valleys, ridgelines, clouds</span></button>
+            <button class="opt-btn" data-q="3" data-v="water" onclick="pick(this)"><span class="opt-label">Waterfalls and rivers</span><span class="opt-sub">Moving water, cool mist</span></button>
+            <button class="opt-btn" data-q="3" data-v="flowers" onclick="pick(this)"><span class="opt-label">Wildflowers and meadows</span><span class="opt-sub">Color, texture, quiet beauty</span></button>
+          </div>
+        </div>
+
+        <div class="question-block">
+          <div class="q-label">Question 4 of 5</div>
+          <div class="q-text">Who are you hiking with?</div>
+          <div class="options-grid cols-3">
+            <button class="opt-btn" data-q="4" data-v="solo" onclick="pick(this)"><span class="opt-label">Just me</span><span class="opt-sub">Quiet reflection</span></button>
+            <button class="opt-btn" data-q="4" data-v="partner" onclick="pick(this)"><span class="opt-label">Partner or friend</span><span class="opt-sub">Good conversation</span></button>
+            <button class="opt-btn" data-q="4" data-v="group" onclick="pick(this)"><span class="opt-label">A whole crew</span><span class="opt-sub">The more the merrier</span></button>
+          </div>
+        </div>
+
+        <div class="question-block">
+          <div class="q-label">Question 5 of 5</div>
+          <div class="q-text">What vibe are you after?</div>
+          <div class="options-grid">
+            <button class="opt-btn" data-q="5" data-v="adventure" onclick="pick(this)"><span class="opt-label">Pure adventure</span><span class="opt-sub">Push limits, feel alive</span></button>
+            <button class="opt-btn" data-q="5" data-v="peaceful" onclick="pick(this)"><span class="opt-label">Peace and quiet</span><span class="opt-sub">Decompress, breathe deep</span></button>
+            <button class="opt-btn" data-q="5" data-v="scenic" onclick="pick(this)"><span class="opt-label">Photo-worthy beauty</span><span class="opt-sub">Every turn is a postcard</span></button>
+            <button class="opt-btn" data-q="5" data-v="discovery" onclick="pick(this)"><span class="opt-label">Explore and discover</span><span class="opt-sub">Hidden gems and secrets</span></button>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="submit-btn" disabled onclick="submitQuiz()">Find my perfect hike →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-results">
+    <div class="results-wrap">
+      <div class="section-header">
+        <h2>Your matched hikes</h2>
+        <p>Based on your personality — click any hike to explore more</p>
+      </div>
+      <div id="hike-loading" style="display:none">
+        <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <p style="font-size:13px;color:var(--text-muted)">Finding your trails...</p>
+      </div>
+      <div class="hike-grid" id="hike-grid"></div>
+      <a class="skip-link" onclick="showPage('social')">Skip to community →</a>
+    </div>
+  </div>
+
+  <div class="page" id="page-social">
+    <div class="social-wrap">
+      <div class="social-grid">
+        <div>
+          <div class="feed-header">
+            <h2>Trail feed</h2>
+            <button class="btn-outline" onclick="openPostModal(null, 'General')">+ Post</button>
+          </div>
+          <div id="social-feed">
+            <div class="empty-state"><div class="empty-icon">🌲</div>No posts yet. Be the first to share!</div>
+          </div>
+        </div>
+
+        <div class="meetups-panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <h3>Upcoming meetups</h3>
+            <button class="btn-outline" onclick="openMeetupModal(null, 'General')">+ Plan</button>
+          </div>
+          <div id="meetups-list">
+            <div class="empty-state"><div class="empty-icon">📅</div>No meetups yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-detail">
+    <div class="detail-wrap">
+      <button class="back-btn" onclick="goBack()">← Back</button>
+
+      <div class="detail-hero" id="detail-hero">
+        <h1 id="detail-title">Trail Name</h1>
+        <div class="tag-row" id="detail-tags"></div>
+        <p id="detail-desc" style="margin-top:0.75rem;"></p>
+        <div class="detail-actions">
+          <button class="action-btn" onclick="openPostModal(currentHike.id, currentHike.name)">📸 Post a photo</button>
+          <button class="action-btn" onclick="openMeetupModal(currentHike.id, currentHike.name)">📅 Plan a meetup</button>
+        </div>
+      </div>
+
+      <div class="detail-tabs">
+        <button class="detail-tab active" onclick="switchTab('posts', this)">Photos & Findings</button>
+        <button class="detail-tab" onclick="switchTab('meetups', this)">Meetups</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-posts">
+        <div id="detail-posts-feed"></div>
+      </div>
+
+      <div class="tab-panel" id="tab-meetups">
+        <div id="detail-meetups-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="post-modal">
+    <div class="modal">
+      <h3>Share your trail experience</h3>
+      <div class="form-group">
+        <label>Your name</label>
+        <input type="text" id="post-author" placeholder="Trail Walker" />
+      </div>
+      <div class="form-group">
+        <label>Caption / findings</label>
+        <textarea id="post-caption" placeholder="What did you discover?"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Upload photo (optional)</label>
+        <input type="file" id="post-photo" accept="image/*" />
+        <div id="post-photo-preview-wrap" style="display:none; margin-top:10px;">
+          <img id="post-photo-preview" alt="Photo preview" style="width:100%; max-height:260px; object-fit:cover; border-radius:8px; border:0.5px solid var(--border);" />
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeModals()">Cancel</button>
+        <button class="modal-submit" onclick="submitPost()">Post →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="meetup-modal">
+    <div class="modal">
+      <h3>Plan a meetup</h3>
+      <div class="form-group">
+        <label>Your name</label>
+        <input type="text" id="meetup-organizer" placeholder="Trailblazer" />
+      </div>
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="meetup-date" />
+      </div>
+      <div class="form-group">
+        <label>Time</label>
+        <input type="time" id="meetup-time" />
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="meetup-notes" placeholder="Meeting point, what to bring..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeModals()">Cancel</button>
+        <button class="modal-submit" onclick="submitMeetup()">Schedule →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="meetup-detail-modal">
+    <div class="modal">
+      <h3>Meetup details</h3>
+
+      <div id="meetup-detail-content" style="margin-bottom:1rem;"></div>
+
+      <div class="form-group">
+        <label>Your name</label>
+        <input type="text" id="rsvp-name" placeholder="Your name" />
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:1rem;">
+        <button class="modal-submit" type="button" onclick="submitRSVP('going')">Going</button>
+        <button class="modal-cancel" type="button" onclick="submitRSVP('not-going')">Not Going</button>
+      </div>
+
+      <div id="meetup-rsvp-summary" style="margin-top:1rem; font-size:13px; color:var(--text-muted);"></div>
+
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeModals()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
