@@ -199,6 +199,9 @@ def attach_photo_urls(hikes):
 @app.route("/find-hikes", methods=["POST"])
 def find_hikes():
     try:
+        if not GOOGLE_MAPS_API_KEY:
+            return jsonify({"error": "Missing GOOGLE_MAPS_API_KEY environment variable."}), 400
+
         body = request.json or {}
 
         location_text = body.get("location", "").strip()
