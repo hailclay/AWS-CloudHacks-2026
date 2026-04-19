@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import { createApiClient } from '../lib/api'
+import { ProfileAvatar } from '../lib/avatars.jsx'
 
 const TIER_COLORS = { S: '#c9a84c', A: '#7eb87e', B: '#6fa3d4', C: '#b87eb8', D: '#aaaaaa' }
 
@@ -55,13 +56,7 @@ export default function UserProfilePage() {
       <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
 
       <div className="profile-header">
-        {profile?.picture ? (
-          <img src={profile.picture} alt="Profile" className="profile-avatar" referrerPolicy="no-referrer" />
-        ) : (
-          <div className="profile-avatar" style={{ background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>
-            🥾
-          </div>
-        )}
+        <ProfileAvatar avatarId={profile?.avatar || 'avatar-1'} size={80} />
         <div>
           <h2 className="profile-name">{profile?.displayName || 'Hiker'}</h2>
           <p className="profile-email">{hikes.length} trail{hikes.length !== 1 ? 's' : ''} hiked</p>

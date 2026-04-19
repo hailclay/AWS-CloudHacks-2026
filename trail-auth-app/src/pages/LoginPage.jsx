@@ -6,11 +6,6 @@ export default function LoginPage() {
   const { loginWithRedirect, isAuthenticated } = useAuth0()
   const navigate = useNavigate()
 
-  // If already logged in, skip the login page
-  useEffect(() => {
-    if (isAuthenticated) navigate('/discover')
-  }, [isAuthenticated])
-
   return (
     <div className="login-page">
       <div className="login-hero">
@@ -23,18 +18,32 @@ export default function LoginPage() {
           Personalized hike recommendations, trail ratings,
           and meetups with people who explore like you.
         </p>
-        <button className="btn-primary" onClick={() => loginWithRedirect()}>
-          Get started
-        </button>
-        <button className="btn-secondary" onClick={() => loginWithRedirect()}>
-          Sign in
-        </button>
+        {isAuthenticated ? (
+          <button className="btn-primary" onClick={() => navigate('/discover')}>
+            Continue
+          </button>
+        ) : (
+          <>
+            <button className="btn-primary" onClick={() => loginWithRedirect()}>
+              Get started
+            </button>
+            <button className="btn-secondary" onClick={() => loginWithRedirect()}>
+              Sign in
+            </button>
+          </>
+        )}
       </div>
       <div className="login-visual">
-        <div className="terrain-block t1" />
-        <div className="terrain-block t2" />
-        <div className="terrain-block t3" />
-        <div className="elevation-label">↑ 2,400 ft</div>
+        <img 
+          src="/mascot-hero.png" 
+          alt="Antsy mascot" 
+          style={{ 
+            width: '100%', 
+            maxWidth: 300, 
+            height: 'auto',
+            objectFit: 'contain'
+          }} 
+        />
       </div>
     </div>
   )

@@ -14,28 +14,46 @@ async function handler(event) {
     const method = event.requestContext?.http?.method || event.httpMethod
     const rawPath = event.rawPath || ''
 
-    // PUT /users/me — set or update display name
+    // PUT /users/me — set or update display name and avatar
     if (method === 'PUT' && rawPath.endsWith('/users/me')) {
       const body = JSON.parse(event.body || '{}')
-      const displayName = body.displayName?.trim()
-      if (!displayName || displayName.length < 2) return err('displayName must be at least 2 characters', 400)
-      if (displayName.length > 30) return err('displayName must be 30 characters or fewer', 400)
+      
+      let updateExpression = 'SET updatedAt = :now'
+      let expressionValues = { ':now': new Date().toISOString() }
+      
+      if (body.displayName !== undefined) {
+        const displayName = body.displayName?.trim()
+        if (!displayName || displayName.length < 2) return err('displayName must be at least 2 characters', 400)
+        if (displayName.length > 30) return err('displayName must be 30 characters or fewer', 400)
 
-      // Check the name isn't already taken by someone else
-      const taken = await dynamo.send(new ScanCommand({
-        TableName: USERS_TABLE,
-        FilterExpression: 'displayName = :name AND userId <> :self',
-        ExpressionAttributeValues: { ':name': displayName, ':self': user.sub },
-      }))
-      if (taken.Items?.length > 0) return err('That display name is already taken', 409)
+        // Check the name isn't already taken by someone else
+        const taken = await dynamo.send(new ScanCommand({
+          TableName: USERS_TABLE,
+          FilterExpression: 'displayName = :name AND userId <> :self',
+          ExpressionAttributeValues: { ':name': displayName, ':self': user.sub },
+        }))
+        if (taken.Items?.length > 0) return err('That display name is already taken', 409)
+        
+        updateExpression += ', displayName = :name'
+        expressionValues[':name'] = displayName
+      }
+      
+      if (body.avatar !== undefined) {
+        const validAvatars = ['avatar-1', 'avatar-2', 'avatar-3']
+        if (!validAvatars.includes(body.avatar)) return err('Invalid avatar selection', 400)
+        
+        updateExpression += ', avatar = :avatar'
+        expressionValues[':avatar'] = body.avatar
+      }
 
       await dynamo.send(new UpdateCommand({
         TableName: USERS_TABLE,
         Key: { userId: user.sub },
-        UpdateExpression: 'SET displayName = :name, updatedAt = :now',
-        ExpressionAttributeValues: { ':name': displayName, ':now': new Date().toISOString() },
+        UpdateExpression: updateExpression,
+        ExpressionAttributeValues: expressionValues,
       }))
-      return ok({ displayName })
+      
+      return ok({ success: true })
     }
 
     // GET /users/me — get own profile (creates it with email prefix if missing)
@@ -48,6 +66,7 @@ async function handler(event) {
       const item = {
         userId: user.sub,
         displayName: emailPrefix,
+        avatar: 'avatar-1', // default avatar
         picture: user.picture || null,
         updatedAt: new Date().toISOString(),
       }

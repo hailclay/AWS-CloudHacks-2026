@@ -1,15 +1,18 @@
 import { useAuth0 } from '@auth0/auth0-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 
 export default function NavBar() {
   const { isAuthenticated } = useAuth0()
+  const navigate = useNavigate()
 
   // Don't show nav on the login page
   if (!isAuthenticated) return null
 
   return (
     <nav className="navbar">
-      <span className="navbar-brand">TrailMatch</span>
+      <span className="navbar-brand" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
+        Antsy
+      </span>
       <div className="navbar-links">
         <NavLink to="/discover" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
           Discover

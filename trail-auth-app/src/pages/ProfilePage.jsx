@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth0 } from '@auth0/auth0-react'
 import { useNavigate } from 'react-router-dom'
 import { createApiClient } from '../lib/api'
+import { AVATAR_OPTIONS, getAvatarUrl, ProfileAvatar } from '../lib/avatars.jsx'
 
 const TIER_COLORS = { S: '#c9a84c', A: '#7eb87e', B: '#6fa3d4', C: '#b87eb8', D: '#aaaaaa' }
 
@@ -19,6 +20,10 @@ export default function ProfilePage() {
   const [nameSaving, setNameSaving] = useState(false)
   const [nameError, setNameError] = useState(null)
 
+  const [editingAvatar, setEditingAvatar] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState('avatar-1')
+  const [avatarSaving, setAvatarSaving] = useState(false)
+
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
@@ -33,8 +38,8 @@ export default function ProfilePage() {
       const { data } = await api.get('/users/me')
       setProfile(data)
       setNameInput(data.displayName)
+      setSelectedAvatar(data.avatar || 'avatar-1')
     } catch (e) {
-      // fallback to email prefix if endpoint fails
       const fallback = (user.email || '').split('@')[0] || 'hiker'
       setNameInput(fallback)
     }
@@ -65,6 +70,19 @@ export default function ProfilePage() {
     }
   }
 
+  async function saveAvatar() {
+    setAvatarSaving(true)
+    try {
+      await api.put('/users/me', { avatar: selectedAvatar })
+      setProfile(prev => ({ ...prev, avatar: selectedAvatar }))
+      setEditingAvatar(false)
+    } catch (e) {
+      alert(e.message || 'Could not save avatar')
+    } finally {
+      setAvatarSaving(false)
+    }
+  }
+
   async function handleSearch(e) {
     e.preventDefault()
     if (searchQuery.trim().length < 2) return
@@ -83,15 +101,66 @@ export default function ProfilePage() {
   return (
     <div className="page">
       <div className="profile-header">
-        <img src={user?.picture} alt="Profile" className="profile-avatar" referrerPolicy="no-referrer" />
+        <ProfileAvatar avatarId={profile?.avatar || 'avatar-1'} size={80} />
         <div>
           <h2 className="profile-name">{profile?.displayName || user?.name}</h2>
           <p className="profile-email">{user?.email}</p>
         </div>
       </div>
 
+      {/* Avatar selector */}
+      <p className="section-label" style={{ marginTop: 24 }}>Avatar</p>
+      {editingAvatar ? (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            {AVATAR_OPTIONS.map(avatar => (
+              <div
+                key={avatar.id}
+                style={{
+                  cursor: 'pointer',
+                  border: selectedAvatar === avatar.id ? '3px solid #7eb87e' : '3px solid transparent',
+                  borderRadius: 8,
+                  padding: 4,
+                }}
+                onClick={() => setSelectedAvatar(avatar.id)}
+              >
+                <img
+                  src={avatar.src}
+                  alt={avatar.name}
+                  style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 4 }}
+                />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn-primary"
+              style={{ width: 'auto', padding: '11px 20px' }}
+              disabled={avatarSaving}
+              onClick={saveAvatar}
+            >
+              {avatarSaving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              className="btn-secondary"
+              style={{ width: 'auto', padding: '11px 16px' }}
+              onClick={() => { setEditingAvatar(false); setSelectedAvatar(profile?.avatar || 'avatar-1') }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <ProfileAvatar avatarId={profile?.avatar || 'avatar-1'} size={40} />
+          <button className="retake-btn" onClick={() => setEditingAvatar(true)}>
+            Change avatar
+          </button>
+        </div>
+      )}
+
       {/* Display name editor */}
-      <p className="section-label" style={{ marginTop: 24 }}>Display name</p>
+      <p className="section-label">Display name</p>
       {editingName ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -158,6 +227,7 @@ export default function ProfilePage() {
               style={{ cursor: 'pointer' }}
               onClick={() => navigate(`/user/${encodeURIComponent(u.userId)}`)}
             >
+              <ProfileAvatar avatarId={u.avatar || 'avatar-1'} size={40} />
               <div className="hike-info">
                 <div className="hike-name">{u.displayName}</div>
               </div>

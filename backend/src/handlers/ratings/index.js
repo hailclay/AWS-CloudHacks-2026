@@ -116,6 +116,7 @@ async function handler(event) {
         return {
           userId: item.userId,
           displayName: u?.displayName || 'Hiker',
+          avatar: u?.avatar || 'avatar-1',
           tier: item.tier,
           review: item.review || null,
           photoUrl: photoUrl(item.photoKey),

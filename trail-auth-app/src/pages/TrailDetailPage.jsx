@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth0 } from '@auth0/auth0-react'
 import { createApiClient } from '../lib/api'
+import { ProfileAvatar } from '../lib/avatars.jsx'
 
 const TIERS = ['S', 'A', 'B', 'C', 'D']
 const TIER_COLORS = { S: '#c9a84c', A: '#7eb87e', B: '#6fa3d4', C: '#b87eb8', D: '#aaaaaa' }
@@ -287,7 +288,7 @@ export default function TrailDetailPage() {
                 onClick={() => navigate(`/user/${encodeURIComponent(r.userId)}`)}
               >
                 <div className="post-meta">
-                  <div className="post-avatar">{r.displayName[0].toUpperCase()}</div>
+                  <ProfileAvatar avatarId={r.avatar || 'avatar-1'} size={40} className="post-avatar" />
                   <div style={{ flex: 1 }}>
                     <div className="post-author">{r.displayName}</div>
                     <div className="post-time">{new Date(r.createdAt).toLocaleDateString()}</div>
