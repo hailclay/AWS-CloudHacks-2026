@@ -529,3 +529,241 @@ body {
   .options-grid.cols-3 { grid-template-columns: 1fr; }
   .onboarding-wrap { padding: 24px 16px 80px; }
 }
+
+/* ── Trail Detail Page ── */
+.back-btn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1.5rem;
+  font-family: 'DM Sans', sans-serif;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.back-btn:hover { color: var(--text); }
+
+.detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.detail-terrain-emoji { font-size: 36px; flex-shrink: 0; }
+.detail-title {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.detail-tagline { font-size: 13px; color: var(--text-muted); }
+
+.detail-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 5px 10px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text);
+}
+.stat-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.map-container {
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+}
+.map-placeholder {
+  background: var(--sky);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.directions-btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: var(--forest);
+  color: white;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  text-decoration: none;
+  margin-bottom: 8px;
+  transition: opacity 0.15s;
+}
+.directions-btn:hover { opacity: 0.85; }
+
+/* Community ratings */
+.ratings-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 8px;
+}
+.ratings-empty { font-size: 13px; color: var(--text-muted); }
+.community-tier-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.community-tier-label { font-size: 12px; color: var(--text-muted); }
+.community-tier-badge {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+.community-tier-count { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+.tier-breakdown { display: flex; flex-direction: column; gap: 6px; }
+.tier-bar-row { display: flex; align-items: center; gap: 8px; }
+.tier-bar-label {
+  font-family: 'Fraunces', serif;
+  font-size: 14px;
+  font-weight: 600;
+  width: 16px;
+  text-align: center;
+}
+.tier-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tier-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.tier-bar-count { font-size: 11px; color: var(--text-muted); width: 16px; text-align: right; }
+
+/* Rating form */
+.rating-form {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 8px;
+}
+.tier-picker {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.tier-btn {
+  flex: 1;
+  min-width: 56px;
+  padding: 10px 6px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.tier-btn:hover { border-color: var(--moss); background: var(--sky); }
+.tier-btn.selected { background: var(--sky); border-width: 1.5px; }
+.tier-btn-letter {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
+.tier-btn-label { font-size: 10px; color: var(--text-muted); }
+.review-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--white);
+  resize: vertical;
+  min-height: 72px;
+  outline: none;
+  margin-bottom: 12px;
+}
+.review-input:focus { border-color: var(--forest); }
+.rating-actions { display: flex; gap: 10px; align-items: center; }
+.rating-success {
+  font-size: 13px;
+  color: var(--moss);
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+/* Posts */
+.posts-list { display: flex; flex-direction: column; gap: 10px; }
+.post-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.post-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.post-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sky);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--forest);
+  flex-shrink: 0;
+}
+.post-author { font-size: 13px; font-weight: 500; color: var(--text); }
+.post-time { font-size: 11px; color: var(--text-muted); }
+.wildlife-tag {
+  font-size: 11px;
+  color: var(--moss);
+  background: var(--sky);
+  padding: 3px 8px;
+  border-radius: 20px;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+.post-caption { font-size: 13px; color: var(--text); line-height: 1.6; }
+
+/* Discover card chevron */
+.card-chevron {
+  font-size: 20px;
+  color: var(--border);
+  flex-shrink: 0;
+  margin-left: 4px;
+}

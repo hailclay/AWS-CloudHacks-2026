@@ -3,6 +3,7 @@ import { useAuth0 } from '@auth0/auth0-react'
 import LoginPage from './pages/LoginPage'
 import OnboardingPage from './pages/OnboardingPage'
 import DiscoverPage from './pages/DiscoverPage'
+import TrailDetailPage from './pages/TrailDetailPage'
 import ProfilePage from './pages/ProfilePage'
 import ProtectedRoute from './components/ProtectedRoute'
 import NavBar from './components/NavBar'
@@ -19,23 +20,20 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
 
-        {/* Onboarding — shown after first login before Discover */}
         <Route path="/onboarding" element={
-          <ProtectedRoute>
-            <OnboardingPage />
-          </ProtectedRoute>
+          <ProtectedRoute><OnboardingPage /></ProtectedRoute>
         } />
 
         <Route path="/discover" element={
-          <ProtectedRoute>
-            <DiscoverPage />
-          </ProtectedRoute>
+          <ProtectedRoute><DiscoverPage /></ProtectedRoute>
+        } />
+
+        <Route path="/trail/:id" element={
+          <ProtectedRoute><TrailDetailPage /></ProtectedRoute>
         } />
 
         <Route path="/profile" element={
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
+          <ProtectedRoute><ProfilePage /></ProtectedRoute>
         } />
       </Routes>
     </>
