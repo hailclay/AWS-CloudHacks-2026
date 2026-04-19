@@ -24,9 +24,10 @@ Globals:
         # The S3 bucket where trail JSON data and post photos live.
         TRAILS_BUCKET: !Ref TrailsBucket
         # Auth0 domain used to verify JWT tokens on every request.
-        # Set this in samconfig.toml or pass as --parameter-overrides at deploy time.
         AUTH0_DOMAIN: !Ref Auth0Domain
         AUTH0_AUDIENCE: !Ref Auth0Audience
+        # Google Maps API key for geocoding and Places search (quiz trail search)
+        GOOGLE_MAPS_KEY: !Ref GoogleMapsKey
 
 # ---------------------------------------------------------------------------
 # Parameters let you pass in values at deploy time without hardcoding secrets.
@@ -39,6 +40,9 @@ Parameters:
   Auth0Audience:
     Type: String
     Description: Your Auth0 API audience identifier
+  GoogleMapsKey:
+    Type: String
+    Description: Google Maps API key for geocoding and Places search
 
 # ---------------------------------------------------------------------------
 # Resources — everything AWS will create when you run `sam deploy`
@@ -84,8 +88,8 @@ Resources:
   PreferencesFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/handlers/preferences/
-      Handler: index.handler
+      CodeUri: src/
+      Handler: handlers/preferences/index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref PreferencesTable
@@ -109,13 +113,21 @@ Resources:
   TrailsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/handlers/trails/
-      Handler: index.handler
+      CodeUri: src/
+      Handler: handlers/trails/index.handler
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref TrailsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref PreferencesTable
         - S3ReadPolicy:
             BucketName: !Ref TrailsBucket
+        # Bedrock permission — allows Lambda to call Claude for trail analysis
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: "*"
       Events:
         ListTrails:
           Type: HttpApi
@@ -129,6 +141,12 @@ Resources:
             ApiId: !Ref TrailMatchApi
             Path: /trails/{id}
             Method: GET
+        SearchTrails:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /trails/search
+            Method: POST
 
   # --- Ratings -------------------------------------------------------------
   # Handles POST /ratings, GET /ratings/{trailId}, DELETE /ratings/{trailId}
@@ -136,8 +154,8 @@ Resources:
   RatingsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/handlers/ratings/
-      Handler: index.handler
+      CodeUri: src/
+      Handler: handlers/ratings/index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref RatingsTable
@@ -166,8 +184,8 @@ Resources:
   EventsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/handlers/events/
-      Handler: index.handler
+      CodeUri: src/
+      Handler: handlers/events/index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref EventsTable
@@ -208,8 +226,8 @@ Resources:
   PostsFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/handlers/posts/
-      Handler: index.handler
+      CodeUri: src/
+      Handler: handlers/posts/index.handler
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref PostsTable

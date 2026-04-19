@@ -1,1 +1,20 @@
 myvenv
+
+# Dependencies
+node_modules/
+
+# AWS SAM build output
+.aws-sam/
+
+# SAM config (contains secrets)
+samconfig.toml
+
+# Environment files (contain secrets)
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/

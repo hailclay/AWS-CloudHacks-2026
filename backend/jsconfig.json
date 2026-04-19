@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "checkJs": false
+  },
+  "exclude": [
+    ".aws-sam",
+    "node_modules"
+  ]
+}
