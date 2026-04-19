@@ -13,7 +13,7 @@
 
 # Get the bucket name from the CloudFormation stack output
 BUCKET=$(aws cloudformation describe-stacks \
-  --stack-name trailmatch-backend \
+  --stack-name awsfinal1 \
   --query "Stacks[0].Outputs[?OutputKey=='TrailsBucketName'].OutputValue" \
   --output text)
 
@@ -30,6 +30,6 @@ echo "Done! Trail data is live."
 echo ""
 echo "Your API URL:"
 aws cloudformation describe-stacks \
-  --stack-name trailmatch-backend \
+  --stack-name awsfinal1 \
   --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" \
   --output text
