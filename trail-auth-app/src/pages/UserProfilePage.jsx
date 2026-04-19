@@ -77,13 +77,22 @@ export default function UserProfilePage() {
       ) : (
         <div className="hike-list">
           {hikes.map((hike, i) => (
-            <div className="hike-card" key={`${hike.trailId}-${i}`}>
-              <div className="hike-info">
-                <div className="hike-name">{hike.trailName || hike.trailId}</div>
-                {hike.review && <div className="hike-tagline">"{hike.review}"</div>}
-                <div className="hike-meta">{new Date(hike.createdAt).toLocaleDateString()}</div>
+            <div className="hike-card" key={`${hike.trailId}-${i}`} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              {hike.photoUrl && (
+                <img
+                  src={hike.photoUrl}
+                  alt="Trail"
+                  style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8 }}
+                />
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="hike-info">
+                  <div className="hike-name">{hike.trailName || hike.trailId}</div>
+                  {hike.review && <div className="hike-tagline">"{hike.review}"</div>}
+                  <div className="hike-meta">{new Date(hike.createdAt).toLocaleDateString()}</div>
+                </div>
+                <div className="tier-badge" style={{ color: TIER_COLORS[hike.tier] }}>{hike.tier}</div>
               </div>
-              <div className="tier-badge" style={{ color: TIER_COLORS[hike.tier] }}>{hike.tier}</div>
             </div>
           ))}
         </div>

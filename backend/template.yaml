@@ -164,12 +164,20 @@ Resources:
             TableName: !Ref RatingsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
+        - S3CrudPolicy:
+            BucketName: !Ref TrailsBucket
       Events:
         SubmitRating:
           Type: HttpApi
           Properties:
             ApiId: !Ref TrailMatchApi
             Path: /ratings
+            Method: POST
+        GetPhotoUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /ratings/upload-url
             Method: POST
         GetTrailRatings:
           Type: HttpApi
@@ -459,15 +467,14 @@ Resources:
     Properties:
       BucketName: !Sub trailmatch-assets-${AWS::AccountId}
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
       CorsConfiguration:
         CorsRules:
           - AllowedOrigins:
-              - "http://localhost:5173"
-              - "http://localhost:3000"
+              - "*"
             AllowedMethods:
               - GET
               - PUT
@@ -475,6 +482,17 @@ Resources:
             AllowedHeaders:
               - "*"
             MaxAge: 3000
+
+  TrailsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TrailsBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${TrailsBucket.Arn}/ratings/*"
 
   # -------------------------------------------------------------------------
   # FRONTEND HOSTING — S3 + CloudFront

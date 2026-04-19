@@ -44,6 +44,8 @@ export default function TrailDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [ratingSuccess, setRatingSuccess] = useState(false)
   const [loadingRatings, setLoadingRatings] = useState(true)
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
 
   useEffect(() => {
     if (!trail) {
@@ -65,6 +67,7 @@ export default function TrailDetailPage() {
         setMyRating(mine)
         setSelectedTier(mine.tier)
         setReview(mine.review || '')
+        setPhotoPreview(mine.photoUrl || null)
       }
     } catch (e) {
       // 404 just means no ratings yet — that's fine
@@ -88,15 +91,33 @@ export default function TrailDetailPage() {
     if (!selectedTier) return
     setSubmitting(true)
     try {
+      let photoKey = myRating?.photoKey || null
+
+      // If a new photo was picked, get a pre-signed URL and upload it
+      if (photoFile) {
+        const { data: urlData } = await api.post('/ratings/upload-url', {
+          trailId,
+          contentType: photoFile.type,
+        })
+        await fetch(urlData.uploadUrl, {
+          method: 'PUT',
+          body: photoFile,
+          headers: { 'Content-Type': photoFile.type },
+        })
+        photoKey = urlData.photoKey
+      }
+
       await api.post('/ratings', {
         trailId,
         trailName: trail.name,
         tier: selectedTier,
         review: review.trim() || null,
+        photoKey,
       })
       setRatingSuccess(true)
-      setMyRating({ tier: selectedTier, review: review.trim() })
-      await loadRatings() // Refresh community ratings
+      setMyRating({ tier: selectedTier, review: review.trim(), photoKey })
+      setPhotoFile(null)
+      await loadRatings()
     } catch (e) {
       alert(e.message || 'Failed to submit rating')
     } finally {
@@ -111,6 +132,8 @@ export default function TrailDetailPage() {
       setMyRating(null)
       setSelectedTier(null)
       setReview('')
+      setPhotoFile(null)
+      setPhotoPreview(null)
       setRatingSuccess(false)
       await loadRatings()
     } catch (e) {
@@ -251,8 +274,41 @@ export default function TrailDetailPage() {
         </div>
       )}
 
-      {/* Rate this trail */}
-      <div className="section-label" style={{ marginTop: 28 }}>
+      {/* Individual reviews */}
+      {!loadingRatings && ratings?.reviews?.length > 0 && (
+        <>
+          <div className="section-label" style={{ marginTop: 28 }}>Reviews</div>
+          <div className="posts-list">
+            {ratings.reviews.map((r, i) => (
+              <div
+                className="post-card"
+                key={`${r.userId}-${i}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => navigate(`/user/${encodeURIComponent(r.userId)}`)}
+              >
+                <div className="post-meta">
+                  <div className="post-avatar">{r.displayName[0].toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <div className="post-author">{r.displayName}</div>
+                    <div className="post-time">{new Date(r.createdAt).toLocaleDateString()}</div>
+                  </div>
+                  <span className="tier-badge" style={{ color: TIER_COLORS[r.tier] }}>{r.tier}</span>
+                </div>
+                {r.photoUrl && (
+                  <img
+                    src={r.photoUrl}
+                    alt="Trail"
+                    style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 8, marginTop: 8 }}
+                  />
+                )}
+                {r.review && <p className="post-caption" style={{ marginTop: 8 }}>{r.review}</p>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Rate this trail */}      <div className="section-label" style={{ marginTop: 28 }}>
         {myRating ? 'Your rating' : 'Rate this trail'}
       </div>
       <div className="rating-form">
@@ -277,6 +333,42 @@ export default function TrailDetailPage() {
           value={review}
           onChange={e => setReview(e.target.value)}
         />
+
+        {/* Photo upload */}
+        <div style={{ marginTop: 12 }}>
+          {photoPreview && (
+            <img
+              src={photoPreview}
+              alt="Trail photo"
+              style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 8 }}
+            />
+          )}
+          <label style={{ display: 'inline-block', cursor: 'pointer' }}>
+            <span className="retake-btn">
+              {photoPreview ? '📷 Change photo' : '📷 Add photo'}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setPhotoFile(file)
+                setPhotoPreview(URL.createObjectURL(file))
+              }}
+            />
+          </label>
+          {photoFile && (
+            <button
+              className="retake-btn"
+              style={{ marginLeft: 8, color: '#d47070' }}
+              onClick={() => { setPhotoFile(null); setPhotoPreview(myRating?.photoUrl || null) }}
+            >
+              Remove
+            </button>
+          )}
+        </div>
 
         <div className="rating-actions">
           <button

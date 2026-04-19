@@ -1,14 +1,22 @@
 'use strict'
 
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
-const { DynamoDBDocumentClient, PutCommand, DeleteCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb')
+const { DynamoDBDocumentClient, PutCommand, DeleteCommand, QueryCommand, BatchGetCommand } = require('@aws-sdk/lib-dynamodb')
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3')
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { requireAuth } = require('../../lib/auth')
 const { ok, err, handleError } = require('../../lib/response')
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}))
+const s3 = new S3Client({})
 const TABLE = process.env.RATINGS_TABLE
 const USERS_TABLE = process.env.USERS_TABLE
+const BUCKET = process.env.TRAILS_BUCKET
 const VALID_TIERS = ['S', 'A', 'B', 'C', 'D']
+
+function photoUrl(key) {
+  return key ? `https://${BUCKET}.s3.amazonaws.com/${key}` : null
+}
 
 async function handler(event) {
   try {
@@ -17,7 +25,21 @@ async function handler(event) {
     const method = event.requestContext?.http?.method || event.httpMethod
     const rawPath = event.rawPath || ''
 
-    // POST /ratings — submit or update a rating
+    // POST /ratings/upload-url
+    if (method === 'POST' && rawPath.endsWith('/ratings/upload-url')) {
+      const body = JSON.parse(event.body || '{}')
+      if (!body.trailId) return err('trailId is required', 400)
+      const ext = body.contentType === 'image/png' ? 'png' : 'jpg'
+      const photoKey = `ratings/${userId}/${encodeURIComponent(body.trailId)}.${ext}`
+      const uploadUrl = await getSignedUrl(
+        s3,
+        new PutObjectCommand({ Bucket: BUCKET, Key: photoKey, ContentType: body.contentType || 'image/jpeg' }),
+        { expiresIn: 300 }
+      )
+      return ok({ uploadUrl, photoKey })
+    }
+
+    // POST /ratings
     if (method === 'POST') {
       const body = JSON.parse(event.body || '{}')
       if (!body.trailId) return err('trailId is required', 400)
@@ -30,11 +52,11 @@ async function handler(event) {
         trailName: body.trailName || null,
         tier: body.tier,
         review: body.review || null,
+        photoKey: body.photoKey || null,
         createdAt: new Date().toISOString(),
       }
       await dynamo.send(new PutCommand({ TableName: TABLE, Item: item }))
 
-      // Upsert the user's display name into UsersTable so they're searchable
       const emailPrefix = (user.email || '').split('@')[0] || 'hiker'
       const displayName = user.name || user.nickname || emailPrefix
       await dynamo.send(new PutCommand({
@@ -45,7 +67,7 @@ async function handler(event) {
       return ok(item, 201)
     }
 
-    // GET /ratings/user/:userId — all ratings by a specific user
+    // GET /ratings/user/:userId
     if (method === 'GET' && rawPath.includes('/ratings/user/')) {
       const targetUserId = event.pathParameters?.userId
       if (!targetUserId) return err('userId is required', 400)
@@ -57,11 +79,13 @@ async function handler(event) {
         ExpressionAttributeValues: { ':userId': targetUserId },
       }))
 
-      const sorted = (result.Items || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      const sorted = (result.Items || [])
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .map(item => ({ ...item, photoUrl: photoUrl(item.photoKey) }))
       return ok(sorted)
     }
 
-    // GET /ratings/:trailId — community ratings for a trail
+    // GET /ratings/:trailId — community ratings + individual reviews with display names
     const trailId = event.pathParameters?.trailId
     if (method === 'GET' && trailId) {
       const result = await dynamo.send(new QueryCommand({
@@ -70,14 +94,52 @@ async function handler(event) {
         KeyConditionExpression: 'trailId = :trailId',
         ExpressionAttributeValues: { ':trailId': trailId },
       }))
+
+      const items = result.Items || []
+
+      // Batch-fetch display names from UsersTable
+      let userMap = {}
+      if (items.length > 0) {
+        const keys = [...new Set(items.map(i => i.userId))].map(uid => ({ userId: uid }))
+        const batchResult = await dynamo.send(new BatchGetCommand({
+          RequestItems: { [USERS_TABLE]: { Keys: keys } },
+        }))
+        for (const u of (batchResult.Responses?.[USERS_TABLE] || [])) {
+          userMap[u.userId] = u
+        }
+      }
+
       const tierCounts = { S: 0, A: 0, B: 0, C: 0, D: 0 }
-      for (const item of result.Items) tierCounts[item.tier] = (tierCounts[item.tier] || 0) + 1
+      const reviews = items.map(item => {
+        tierCounts[item.tier] = (tierCounts[item.tier] || 0) + 1
+        const u = userMap[item.userId]
+        return {
+          userId: item.userId,
+          displayName: u?.displayName || 'Hiker',
+          tier: item.tier,
+          review: item.review || null,
+          photoUrl: photoUrl(item.photoKey),
+          createdAt: item.createdAt,
+        }
+      }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
       const communityTier = Object.entries(tierCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
-      return ok({ ratings: result.Items, tierCounts, communityTier, totalRatings: result.Items.length })
+      return ok({ ratings: items, reviews, tierCounts, communityTier, totalRatings: items.length })
     }
 
-    // DELETE /ratings/:trailId — remove a rating
+    // DELETE /ratings/:trailId
     if (method === 'DELETE' && trailId) {
+      const existing = await dynamo.send(new QueryCommand({
+        TableName: TABLE,
+        IndexName: 'UserRatingsIndex',
+        KeyConditionExpression: 'userId = :userId',
+        FilterExpression: 'trailId = :trailId',
+        ExpressionAttributeValues: { ':userId': userId, ':trailId': trailId },
+      }))
+      const item = existing.Items?.[0]
+      if (item?.photoKey) {
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: item.photoKey })).catch(() => {})
+      }
       await dynamo.send(new DeleteCommand({ TableName: TABLE, Key: { userId, trailId } }))
       return ok({ deleted: true })
     }
