@@ -7,6 +7,7 @@ const { ok, err, handleError } = require('../../lib/response')
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}))
 const TABLE = process.env.RATINGS_TABLE
+const USERS_TABLE = process.env.USERS_TABLE
 const VALID_TIERS = ['S', 'A', 'B', 'C', 'D']
 
 async function handler(event) {
@@ -14,8 +15,9 @@ async function handler(event) {
     const user = await requireAuth(event)
     const userId = user.sub
     const method = event.requestContext?.http?.method || event.httpMethod
-    const trailId = event.pathParameters?.trailId
+    const rawPath = event.rawPath || ''
 
+    // POST /ratings — submit or update a rating
     if (method === 'POST') {
       const body = JSON.parse(event.body || '{}')
       if (!body.trailId) return err('trailId is required', 400)
@@ -25,29 +27,56 @@ async function handler(event) {
       const item = {
         userId,
         trailId: body.trailId,
+        trailName: body.trailName || null,
         tier: body.tier,
         review: body.review || null,
         createdAt: new Date().toISOString(),
       }
       await dynamo.send(new PutCommand({ TableName: TABLE, Item: item }))
+
+      // Upsert the user's display name into UsersTable so they're searchable
+      const emailPrefix = (user.email || '').split('@')[0] || 'hiker'
+      const displayName = user.name || user.nickname || emailPrefix
+      await dynamo.send(new PutCommand({
+        TableName: USERS_TABLE,
+        Item: { userId, displayName, picture: user.picture || null, updatedAt: new Date().toISOString() },
+      }))
+
       return ok(item, 201)
     }
 
+    // GET /ratings/user/:userId — all ratings by a specific user
+    if (method === 'GET' && rawPath.includes('/ratings/user/')) {
+      const targetUserId = event.pathParameters?.userId
+      if (!targetUserId) return err('userId is required', 400)
+
+      const result = await dynamo.send(new QueryCommand({
+        TableName: TABLE,
+        IndexName: 'UserRatingsIndex',
+        KeyConditionExpression: 'userId = :userId',
+        ExpressionAttributeValues: { ':userId': targetUserId },
+      }))
+
+      const sorted = (result.Items || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      return ok(sorted)
+    }
+
+    // GET /ratings/:trailId — community ratings for a trail
+    const trailId = event.pathParameters?.trailId
     if (method === 'GET' && trailId) {
-      const result = await dynamo.send(
-        new QueryCommand({
-          TableName: TABLE,
-          IndexName: 'TrailRatingsIndex',
-          KeyConditionExpression: 'trailId = :trailId',
-          ExpressionAttributeValues: { ':trailId': trailId },
-        })
-      )
+      const result = await dynamo.send(new QueryCommand({
+        TableName: TABLE,
+        IndexName: 'TrailRatingsIndex',
+        KeyConditionExpression: 'trailId = :trailId',
+        ExpressionAttributeValues: { ':trailId': trailId },
+      }))
       const tierCounts = { S: 0, A: 0, B: 0, C: 0, D: 0 }
       for (const item of result.Items) tierCounts[item.tier] = (tierCounts[item.tier] || 0) + 1
       const communityTier = Object.entries(tierCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null
       return ok({ ratings: result.Items, tierCounts, communityTier, totalRatings: result.Items.length })
     }
 
+    // DELETE /ratings/:trailId — remove a rating
     if (method === 'DELETE' && trailId) {
       await dynamo.send(new DeleteCommand({ TableName: TABLE, Key: { userId, trailId } }))
       return ok({ deleted: true })

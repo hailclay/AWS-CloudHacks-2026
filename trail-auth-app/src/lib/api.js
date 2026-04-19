@@ -83,5 +83,12 @@ export function createApiClient(getAccessTokenSilently) {
 
     delete: (path) =>
       request(path, { method: 'DELETE' }, getAccessTokenSilently),
+
+    put: (path, body) =>
+      request(
+        path,
+        { method: 'PUT', body: JSON.stringify(body) },
+        getAccessTokenSilently
+      ),
   }
 }

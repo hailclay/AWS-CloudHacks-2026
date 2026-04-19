@@ -90,6 +90,7 @@ export default function TrailDetailPage() {
     try {
       await api.post('/ratings', {
         trailId,
+        trailName: trail.name,
         tier: selectedTier,
         review: review.trim() || null,
       })

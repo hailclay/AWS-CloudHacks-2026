@@ -21,6 +21,7 @@ Globals:
         RATINGS_TABLE: !Ref RatingsTable
         EVENTS_TABLE: !Ref EventsTable
         POSTS_TABLE: !Ref PostsTable
+        USERS_TABLE: !Ref UsersTable
         # The S3 bucket where trail JSON data and post photos live.
         TRAILS_BUCKET: !Ref TrailsBucket
         # Auth0 domain used to verify JWT tokens on every request.
@@ -63,6 +64,7 @@ Resources:
         AllowOrigins:
           - "http://localhost:5173"   # Vite dev server
           - "http://localhost:3000"   # Alternative local port
+          - !Sub "https://${FrontendDistribution.DomainName}"  # CloudFront
         AllowHeaders:
           - Content-Type
           - Authorization             # Needed to pass the Auth0 JWT token
@@ -150,7 +152,8 @@ Resources:
 
   # --- Ratings -------------------------------------------------------------
   # Handles POST /ratings, GET /ratings/{trailId}, DELETE /ratings/{trailId}
-  # One rating per user per trail — Lambda enforces this with a conditional write.
+  # GET /ratings/user/{userId} — all ratings by a specific user
+  # Also writes to UsersTable on rating submit to keep display names searchable.
   RatingsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -159,6 +162,8 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref RatingsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
       Events:
         SubmitRating:
           Type: HttpApi
@@ -172,12 +177,54 @@ Resources:
             ApiId: !Ref TrailMatchApi
             Path: /ratings/{trailId}
             Method: GET
+        GetUserRatings:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /ratings/user/{userId}
+            Method: GET
         DeleteRating:
           Type: HttpApi
           Properties:
             ApiId: !Ref TrailMatchApi
             Path: /ratings/{trailId}
             Method: DELETE
+
+  # --- Users ---------------------------------------------------------------
+  # Handles GET /users/search?q=username and GET /users/{userId}
+  UsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/users/index.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+      Events:
+        GetMyProfile:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /users/me
+            Method: GET
+        UpdateMyProfile:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /users/me
+            Method: PUT
+        SearchUsers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /users/search
+            Method: GET
+        GetUser:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref TrailMatchApi
+            Path: /users/{userId}
+            Method: GET
 
   # --- Events --------------------------------------------------------------
   # Handles CRUD for hike meetup events.
@@ -315,12 +362,16 @@ Resources:
           KeyType: HASH
         - AttributeName: trailId
           KeyType: RANGE
-      # GSI lets us query "all ratings for a given trail" efficiently.
-      # Without this, we'd have to scan the whole table — slow and expensive.
       GlobalSecondaryIndexes:
         - IndexName: TrailRatingsIndex
           KeySchema:
             - AttributeName: trailId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: UserRatingsIndex
+          KeySchema:
+            - AttributeName: userId
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -371,6 +422,30 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  # Stores public user profiles for search (display name keyed by userId).
+  # Written to whenever a user submits a rating.
+  # GSI on displayName allows searching by username.
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TrailMatch-Users
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: displayName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: DisplayNameIndex
+          KeySchema:
+            - AttributeName: displayName
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
   # -------------------------------------------------------------------------
   # S3 BUCKET
   # One bucket for everything: trail seed data JSON, trail images, post photos.
@@ -401,6 +476,72 @@ Resources:
               - "*"
             MaxAge: 3000
 
+  # -------------------------------------------------------------------------
+  # FRONTEND HOSTING — S3 + CloudFront
+  # S3 bucket holds the built React app (dist/ folder).
+  # CloudFront serves it over HTTPS globally and handles SPA routing.
+  # -------------------------------------------------------------------------
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub trailmatch-frontend-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Allows CloudFront (and only CloudFront) to read from the frontend bucket
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}"
+
+  # CloudFront Origin Access Control — modern replacement for OAI
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub trailmatch-frontend-oac-${AWS::AccountId}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: FrontendS3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOAC.Id
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: FrontendS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized managed policy
+          AllowedMethods: [GET, HEAD, OPTIONS]
+        # SPA routing — send all 404s back to index.html so React Router handles them
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
 # ---------------------------------------------------------------------------
 # Outputs — printed after `sam deploy` so you can copy the API URL into
 # your React app's .env file without digging through the AWS console.
@@ -412,3 +553,9 @@ Outputs:
   TrailsBucketName:
     Description: "S3 bucket name for trail data and post photos"
     Value: !Ref TrailsBucket
+  FrontendBucketName:
+    Description: "S3 bucket for the React frontend — run: aws s3 sync dist/ s3://BUCKET_NAME --delete"
+    Value: !Ref FrontendBucket
+  FrontendUrl:
+    Description: "Your live app URL — also add this to Auth0 allowed callback/logout URLs"
+    Value: !Sub "https://${FrontendDistribution.DomainName}"
